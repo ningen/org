@@ -1,0 +1,279 @@
+#+title: Windows: GlazeWM / YASB Reborn 利用ガイド
+#+startup: overview
+
+* 概要
+
+GlazeWMはWindows上でウィンドウをタイル状に配置するウィンドウマネージャー、
+YASB Rebornはworkspace、時計、system trayなどを表示するstatus barである。
+
+この環境では、GlazeWMの起動時にYASBも起動する。
+YASB側のautostartを同時に有効にすると二重起動するため、通常はGlazeWMだけを
+Windows login時に起動する。
+
+- GlazeWM公式: https://github.com/glzr-io/glazewm
+- YASB Reborn公式: https://github.com/amnweb/yasb
+
+* 管理範囲
+
+** dotfilesで管理するもの
+
+| 対象 | 場所 |
+|------+------|
+| GlazeWM設定の正本 | =windows/glazewm/config.yaml= |
+| GlazeWM設定のlink | =%USERPROFILE%\.glzr\glazewm\config.yaml= |
+| package manifest | =windows/packages/packages.psd1= |
+| Windows bootstrap | =windows/bootstrap.ps1= |
+
+ここでいう相対pathはdotfiles repositoryを基準とする。
+
+** machine側で生成されるもの
+
+| 対象 | 場所 |
+|------+------|
+| YASB設定 | =%USERPROFILE%\.config\yasb\config.yaml= |
+| YASB style | =%USERPROFILE%\.config\yasb\styles.css= |
+| YASB log | =%USERPROFILE%\.config\yasb\yasb.log= |
+| GlazeWM error log | =%USERPROFILE%\.glzr\glazewm\errors.log= |
+
+YASBの設定はfirst-run wizardが生成する。API key、location、machine固有のmonitor
+指定などが入り得るため、内容を確認せずdotfilesやこの公開Org repositoryへ
+commitしない。
+
+* 基本操作
+
+** 起動
+
+PowerShellで次を実行する。
+
+#+begin_src powershell
+glazewm start
+#+end_src
+
+GlazeWM設定の =startup_commands= によりYASBも起動する。
+
+個別に起動する場合:
+
+#+begin_src powershell
+yasbc start
+#+end_src
+
+** 停止
+
+#+begin_src powershell
+glazewm command wm-exit
+yasbc stop
+#+end_src
+
+GlazeWMの正常終了時には設定の =shutdown_commands= でもYASBを終了する。
+
+** 設定の再読込
+
+GlazeWMは =Alt+Shift+R=、または次のcommandで再読込する。
+
+#+begin_src powershell
+glazewm command wm-reload-config
+#+end_src
+
+YASB:
+
+#+begin_src powershell
+yasbc reload
+#+end_src
+
+* キー操作
+
+現在の =windows/glazewm/config.yaml= に対応する。
+
+** focusとwindow移動
+
+| 操作 | key |
+|------+-----|
+| 左へfocus | =Alt+H= / =Alt+Left= |
+| 右へfocus | =Alt+L= / =Alt+Right= |
+| 上へfocus | =Alt+K= / =Alt+Up= |
+| 下へfocus | =Alt+J= / =Alt+Down= |
+| windowを左へ移動 | =Alt+Shift+H= / =Alt+Shift+Left= |
+| windowを右へ移動 | =Alt+Shift+L= / =Alt+Shift+Right= |
+| windowを上へ移動 | =Alt+Shift+K= / =Alt+Shift+Up= |
+| windowを下へ移動 | =Alt+Shift+J= / =Alt+Shift+Down= |
+
+** workspace
+
+| 操作 | key |
+|------+-----|
+| workspace 1〜9へ移動 | =Alt+1= 〜 =Alt+9= |
+| windowをworkspace 1〜9へ送る | =Alt+Shift+1= 〜 =Alt+Shift+9= |
+| 直前のworkspaceへ戻る | =Alt+D= |
+
+** layoutとwindow状態
+
+| 操作 | key |
+|------+-----|
+| 次のwindowを置く方向を切り替える | =Alt+V= |
+| floatingを切り替える | =Alt+Shift+Space= |
+| fullscreenを切り替える | =Alt+F= |
+| active windowを閉じる | =Alt+Shift+Q= |
+| Windows Terminalを開く | =Alt+Enter= |
+| resize modeへ入る | =Alt+R= |
+| 設定を再読込 | =Alt+Shift+R= |
+
+resize mode中は =H/J/K/L= またはarrow keyで大きさを変える。
+=Escape=、=Enter=、=Alt+R= のいずれかでresize modeを終了する。
+
+* 自動起動
+
+GlazeWMを起動し、system trayのGlazeWM iconを右clickして
+=Run on system startup= を有効にする。
+
+YASBはGlazeWMから起動するため、通常は次を実行しない。
+
+#+begin_src powershell
+# GlazeWMと併用すると二重起動になるため、通常は無効のままにする。
+yasbc enable-autostart
+#+end_src
+
+すでにYASB autostartを有効にしている場合:
+
+#+begin_src powershell
+yasbc disable-autostart
+#+end_src
+
+* 設定変更
+
+** GlazeWM
+
+link先ではなくdotfiles側の =windows/glazewm/config.yaml= を編集する。
+
+#+begin_src powershell
+glazewm command wm-reload-config
+Get-Content "$env:USERPROFILE\.glzr\glazewm\errors.log"
+#+end_src
+
+=errors.log= が空ならconfig parse errorは発生していない。
+
+主な調整箇所:
+
+- =gaps=: window間とscreen端の余白
+- =workspaces=: workspace名やmonitor割り当て
+- =window_rules=: applicationごとのfloating/ignore/workspace指定
+- =keybindings=: keyboard shortcut
+- =startup_commands= / =shutdown_commands=: YASBなどの連携
+
+** YASB
+
+YASBの設定directoryを確認する。
+
+#+begin_src powershell
+yasbc --config
+#+end_src
+
+=config.yaml= または =styles.css= を編集したら再読込する。
+
+#+begin_src powershell
+yasbc reload
+#+end_src
+
+設定schemaがversion updateで変更された場合:
+
+#+begin_src powershell
+yasbc migrate-config
+#+end_src
+
+* 更新と再適用
+
+dotfiles repositoryのWindows cloneで実行する。
+
+#+begin_src powershell
+pwsh -NoProfile -File .\windows\bootstrap.ps1 -DryRun -Upgrade
+pwsh -NoProfile -File .\windows\bootstrap.ps1 -Upgrade
+#+end_src
+
+設定linkだけを再適用する場合:
+
+#+begin_src powershell
+pwsh -NoProfile -File .\setup-dotfiles.ps1 -DryRun
+pwsh -NoProfile -File .\setup-dotfiles.ps1
+#+end_src
+
+2回目の実行でpackageとlinkが =NOOP= になれば冪等性が保たれている。
+
+* 状態確認
+
+** version
+
+#+begin_src powershell
+glazewm --version
+yasbc --version
+#+end_src
+
+** GlazeWM
+
+#+begin_src powershell
+glazewm query monitors
+glazewm query workspaces
+Get-Content "$env:USERPROFILE\.glzr\glazewm\errors.log"
+#+end_src
+
+query commandはGlazeWM起動中に実行する。
+
+** YASB
+
+#+begin_src powershell
+yasbc log
+#+end_src
+
+=yasbc log= はlogを追跡し続けるため、終了するときは =Ctrl+C= を押す。
+
+* トラブルシューティング
+
+** commandが見つからない
+
+install直後は新しいPATHが現在のprocessへ反映されない場合がある。
+PowerShellを閉じて新しく開き直す。
+
+通常のinstall先:
+
+- GlazeWM CLI: =%ProgramFiles%\glzr.io\GlazeWM\cli=
+- YASB: =%ProgramFiles%\YASB=
+
+** YASBが二重起動する
+
+#+begin_src powershell
+yasbc stop
+yasbc disable-autostart
+glazewm command wm-exit
+glazewm start
+#+end_src
+
+GlazeWMだけをautostart対象にする。
+
+** YASBにworkspaceが表示されない
+
+1. GlazeWMが起動しているか確認する。
+2. =yasbc log= でGlazeWM WebSocketの接続状態を見る。
+3. GlazeWMを起動してから =yasbc reload= を実行する。
+
+** config変更後にGlazeWMが起動しない
+
+#+begin_src powershell
+Get-Content "$env:USERPROFILE\.glzr\glazewm\errors.log"
+#+end_src
+
+直前の変更をdotfiles側で修正し、再起動する。
+
+#+begin_src powershell
+glazewm start --config="$env:USERPROFILE\.glzr\glazewm\config.yaml"
+#+end_src
+
+** Alt shortcutがapplicationと競合する
+
+application側のshortcutか、GlazeWMの =keybindings= のどちらかを変更する。
+変更後は =Alt+Shift+R= で再読込する。
+
+* 運用上の注意
+
+- GlazeWM/YASBを管理者権限で常用しない。
+- API key、token、location、machine固有pathをOrgやdotfilesへcommitしない。
+- generated YASB configを管理対象に加える場合は秘密情報を分離してから行う。
+- GlazeWM/YASBを同時に複数起動しない。
+- 大きな設定変更前には =-DryRun= とGit diffを確認する。
